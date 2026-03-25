@@ -66,7 +66,7 @@ Starting from just **5 atomic skills**, the system:
 
 ```bash
 # 1. Add the marketplace
-claude plugins marketplace add github:tmdgusya/momento --sparse memento-skills
+claude plugins marketplace add tmdgusya/momento
 
 # 2. Install the plugin
 claude plugins install memento-skills@momento
@@ -77,11 +77,8 @@ claude plugins install memento-skills@momento
 ### Verify installation
 
 ```bash
-# Check plugin is listed
 claude plugins list
-
-# Validate plugin structure
-claude plugins validate ~/.claude/plugins/cache/momento/memento-skills/*/
+# Should show: memento-skills@momento  Version: 0.1.0  Status: ✔ enabled
 ```
 
 ### Uninstall
