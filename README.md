@@ -62,31 +62,39 @@ Starting from just **5 atomic skills**, the system:
 
 ## Installation
 
+### From GitHub (recommended)
+
 ```bash
-# Clone
-git clone https://github.com/tmdgusya/momento.git
+# 1. Add the marketplace
+claude plugins marketplace add github:tmdgusya/momento --sparse memento-skills
 
-# Validate
-cd momento/memento-skills
-claude plugins validate .
+# 2. Install the plugin
+claude plugins install memento-skills@momento
 
-# Install (add to your Claude Code settings)
-claude plugins add /path/to/momento/memento-skills
+# 3. Restart Claude Code to activate
 ```
 
-Or add manually to `~/.claude/settings.json`:
-```json
-{
-  "enabledPlugins": {
-    "memento-skills@local": true
-  }
-}
+### Verify installation
+
+```bash
+# Check plugin is listed
+claude plugins list
+
+# Validate plugin structure
+claude plugins validate ~/.claude/plugins/cache/momento/memento-skills/*/
+```
+
+### Uninstall
+
+```bash
+claude plugins uninstall memento-skills@momento
+claude plugins marketplace remove momento
 ```
 
 ### Requirements
 
-- Claude Code CLI
-- `jq` recommended (falls back to basic mode without it)
+- [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code)
+- `jq` recommended for full metrics table in session hook (falls back to basic mode without it)
 - `bc` for utility threshold comparisons
 
 ## Usage

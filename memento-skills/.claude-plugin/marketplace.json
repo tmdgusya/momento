@@ -1,0 +1,20 @@
+{
+  "name": "momento",
+  "owner": {
+    "name": "tmdgusya",
+    "email": "dev0jsh@gmail.com"
+  },
+  "metadata": {
+    "description": "Self-evolving skill system — learn reusable patterns from experience via Read-Write Reflective Learning",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "memento-skills",
+      "source": "./",
+      "description": "Learn reusable patterns from task experience. Tracks per-skill utility scores, auto-injects learned skills at session start, and provides reflect/create/optimize/stats/prune commands.",
+      "category": "skills",
+      "tags": ["skills", "learning", "reflection", "metrics", "self-evolving", "memento", "SRDP"]
+    }
+  ]
+}
