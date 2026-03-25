@@ -11,7 +11,7 @@
   "plugins": [
     {
       "name": "memento-skills",
-      "source": "./",
+      "source": "./memento-skills",
       "description": "Learn reusable patterns from task experience. Tracks per-skill utility scores, auto-injects learned skills at session start, and provides reflect/create/optimize/stats/prune commands.",
       "category": "skills",
       "tags": ["skills", "learning", "reflection", "metrics", "self-evolving", "memento", "SRDP"]
