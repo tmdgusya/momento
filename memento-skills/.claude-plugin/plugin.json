@@ -1,0 +1,10 @@
+{
+  "name": "memento-skills",
+  "description": "Self-evolving skill system — learn reusable patterns from experience via Read-Write Reflective Learning",
+  "version": "0.1.0",
+  "author": {
+    "name": "roach"
+  },
+  "license": "MIT",
+  "keywords": ["skills", "learning", "reflection", "metrics", "self-evolving", "memento"]
+}

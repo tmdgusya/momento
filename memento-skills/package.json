@@ -1,0 +1,6 @@
+{
+  "name": "memento-skills",
+  "version": "0.1.0",
+  "description": "Self-evolving skill system for Claude Code",
+  "license": "MIT"
+}

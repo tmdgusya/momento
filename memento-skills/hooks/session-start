@@ -1,0 +1,153 @@
+#!/usr/bin/env bash
+# SessionStart hook for memento-skills plugin
+# Read Phase: loads metrics and injects learned skill context
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PLUGIN_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+GLOBAL_METRICS="${HOME}/.claude/memento/metrics.json"
+PROJECT_METRICS=".claude/memento/metrics.json"
+
+# --- helpers ---
+
+has_jq() { command -v jq >/dev/null 2>&1; }
+
+# Read a metrics.json, output tab-separated skill rows.
+# Each row: name \t utility_display \t usage_count \t scope \t last_used \t raw_utility
+read_metrics() {
+  local file="$1"
+  [ -f "$file" ] || return 0
+
+  if has_jq; then
+    jq -r '
+      .skills // {} | to_entries[] |
+      .key as $name |
+      .value |
+      (if .utility == null then "\u2014"
+       else (.utility * 100 | floor / 100 | tostring)
+       end) as $util_raw |
+      (if .utility == null then
+         "\u2014 (\(.success_count)/\(.success_count + .failure_count))"
+       else
+         "\($util_raw) (\(.success_count)/\(.success_count + .failure_count))"
+       end) as $util_display |
+      "\($name)\t\($util_display)\t\(.usage_count)\t\(.scope)\t\(.last_used)\t\($util_raw)"
+    ' "$file" 2>/dev/null || true
+  else
+    # Minimal fallback: just report that learned skills exist
+    if grep -q '"skills"' "$file" 2>/dev/null; then
+      local count
+      count=$(grep -c '"scope"' "$file" 2>/dev/null || echo 0)
+      echo "__fallback__${count}"
+    fi
+  fi
+}
+
+# --- main ---
+
+global_rows=""
+project_rows=""
+global_count=0
+project_count=0
+
+if [ -f "$GLOBAL_METRICS" ]; then
+  global_rows=$(read_metrics "$GLOBAL_METRICS")
+  if [ -n "$global_rows" ]; then
+    global_count=$(echo "$global_rows" | wc -l | tr -d ' ')
+  fi
+fi
+
+if [ -f "$PROJECT_METRICS" ]; then
+  project_rows=$(read_metrics "$PROJECT_METRICS")
+  if [ -n "$project_rows" ]; then
+    project_count=$(echo "$project_rows" | wc -l | tr -d ' ')
+  fi
+fi
+
+total=$((global_count + project_count))
+
+# Build context string
+context=""
+
+if [ "$total" -eq 0 ]; then
+  context="<memento-skills-context>\nYou have memento-skills installed. No learned skills yet.\nAfter completing significant tasks, consider using /memento reflect to capture reusable patterns.\n</memento-skills-context>"
+else
+  # Combine rows
+  all_rows=""
+  [ -n "$global_rows" ] && all_rows="$global_rows"
+  if [ -n "$project_rows" ]; then
+    [ -n "$all_rows" ] && all_rows="${all_rows}"$'\n'"${project_rows}" || all_rows="$project_rows"
+  fi
+
+  # Check for fallback mode
+  if echo "$all_rows" | grep -q "^__fallback__"; then
+    context="<memento-skills-context>\nYou have learned skills from past experience. Use them when relevant.\nAfter completing significant tasks, consider using /memento reflect.\n\nLearned skills available: ${total} (install jq for detailed metrics table).\n</memento-skills-context>"
+  else
+    # Build markdown table
+    table="| Skill | Utility | Uses | Scope | Last Used |\n|-------|---------|------|-------|-----------|"
+    warnings=""
+    shown=0
+    max_shown=20
+
+    # Read threshold from global config
+    threshold="0.4"
+    if has_jq && [ -f "$GLOBAL_METRICS" ]; then
+      threshold=$(jq -r '.config.utility_threshold // 0.4' "$GLOBAL_METRICS" 2>/dev/null || echo "0.4")
+    fi
+    min_samples="3"
+    if has_jq && [ -f "$GLOBAL_METRICS" ]; then
+      min_samples=$(jq -r '.config.min_samples_for_judgment // 3' "$GLOBAL_METRICS" 2>/dev/null || echo "3")
+    fi
+
+    while IFS=$'\t' read -r name util_display usage scope last_used raw_util; do
+      [ -z "$name" ] && continue
+      if [ "$shown" -ge "$max_shown" ]; then
+        continue
+      fi
+      table="${table}\n| ${name} | ${util_display} | ${usage} | ${scope} | ${last_used} |"
+      shown=$((shown + 1))
+
+      # Check for low-utility warning (pure bash comparison — no jq needed)
+      if [ "$raw_util" != "—" ] && [ "$raw_util" != "null" ] && [ -n "$raw_util" ]; then
+        if [ "$(echo "$raw_util < $threshold" | bc -l 2>/dev/null || echo 0)" = "1" ] && \
+           [ "$usage" -ge "$min_samples" ] 2>/dev/null; then
+          warnings="${warnings}\n* ${name}: utility below threshold (${raw_util} < ${threshold}). Consider /memento optimize or /memento prune."
+        fi
+      fi
+    done <<< "$all_rows"
+
+    remainder=$((total - shown))
+    overflow=""
+    if [ "$remainder" -gt 0 ]; then
+      overflow="\n... and ${remainder} more learned skills."
+    fi
+
+    context="<memento-skills-context>\nYou have learned skills from past experience. Use them when relevant.\nAfter completing significant tasks, consider using /memento reflect.\n\n## Learned Skills (${global_count} global, ${project_count} project)\n\n${table}${overflow}${warnings}\n</memento-skills-context>"
+  fi
+fi
+
+# --- output ---
+
+escape_for_json() {
+  local s="$1"
+  s="${s//\\/\\\\}"
+  s="${s//\"/\\\"}"
+  s="${s//$'\n'/\\n}"
+  s="${s//$'\r'/\\r}"
+  s="${s//$'\t'/\\t}"
+  printf '%s' "$s"
+}
+
+escaped=$(escape_for_json "$context")
+
+if [ -n "${CURSOR_PLUGIN_ROOT:-}" ]; then
+  printf '{\n  "additional_context": "%s"\n}\n' "$escaped"
+elif [ -n "${CLAUDE_PLUGIN_ROOT:-}" ]; then
+  printf '{\n  "hookSpecificOutput": {\n    "hookEventName": "SessionStart",\n    "additionalContext": "%s"\n  }\n}\n' "$escaped"
+else
+  printf '{\n  "additional_context": "%s"\n}\n' "$escaped"
+fi
+
+exit 0
